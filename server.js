@@ -8,21 +8,23 @@ const PORT = Number(process.env.PORT) || 5000;
 
 const startServer = async () => {
   try {
-    // Connect to MongoDB first
     await connectDB();
 
-    // Start Express server only after successful DB connection
-    app.listen(PORT, () => {
+    const server = app.listen(PORT, () => {
       console.log("----------------------------------");
       console.log(" Doctor Tracker Backend Started");
       console.log(` Server: http://localhost:${PORT}`);
-      console.log(` Environment: ${process.env.NODE_ENV}`);
+      console.log(` Environment: ${process.env.NODE_ENV || "development"}`);
       console.log("----------------------------------");
     });
 
+    server.on("error", (error) => {
+      console.error("Server Error:", error.message);
+      process.exitCode = 1;
+    });
   } catch (error) {
     console.error("Server Startup Failed:", error.message);
-    process.exit(1);
+    process.exitCode = 1;
   }
 };
 

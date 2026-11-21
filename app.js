@@ -6,6 +6,8 @@ import morgan from "morgan";
 import cookieParser from "cookie-parser";
 import rateLimit from "express-rate-limit";
 
+import connectDB from "./src/config/db.js";
+
 import authRoutes from "./src/routes/authRoutes.js";
 import doctorRoutes from "./src/routes/doctorRoutes.js";
 import patientRoutes from "./src/routes/patientRoutes.js";
@@ -30,63 +32,38 @@ const normalizeOrigin = (value = "") => {
 };
 
 const allowedOrigins = new Set(
-  (
-    process.env.FRONTEND_URL ||
-    "http://localhost:3000"
-  )
+  (process.env.FRONTEND_URL || "http://localhost:3000")
     .split(",")
     .map(normalizeOrigin)
     .filter(Boolean)
 );
 
-const corsOptions = {
-  origin(origin, callback) {
-    if (!origin) {
-      return callback(null, true);
-    }
+app.use(
+  cors({
+    origin(origin, callback) {
+      if (!origin) {
+        return callback(null, true);
+      }
 
-    const normalizedOrigin = normalizeOrigin(origin);
+      const normalizedOrigin = normalizeOrigin(origin);
 
-    if (allowedOrigins.has(normalizedOrigin)) {
-      return callback(null, origin);
-    }
+      if (allowedOrigins.has(normalizedOrigin)) {
+        return callback(null, origin);
+      }
 
-    console.warn(`[CORS] Blocked origin: ${origin}`);
+      console.warn(`[CORS] Blocked origin: ${origin}`);
 
-    return callback(new Error("Origin not allowed by CORS"));
-  },
+      return callback(new Error("Origin not allowed by CORS"));
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+    optionsSuccessStatus: 204,
+  })
+);
 
-  credentials: true,
-
-  methods: [
-    "GET",
-    "POST",
-    "PUT",
-    "PATCH",
-    "DELETE",
-    "OPTIONS",
-  ],
-
-  allowedHeaders: [
-    "Content-Type",
-    "Authorization",
-  ],
-
-  optionsSuccessStatus: 204,
-};
-
-app.use(cors(corsOptions));
-
-app.use(express.json({
-  limit: "10kb",
-  strict: true,
-}));
-
-app.use(express.urlencoded({
-  extended: true,
-  limit: "10kb",
-}));
-
+app.use(express.json({ limit: "10kb", strict: true }));
+app.use(express.urlencoded({ extended: true, limit: "10kb" }));
 app.use(cookieParser());
 
 if (process.env.NODE_ENV !== "production") {
@@ -108,10 +85,20 @@ app.use(
   })
 );
 
+app.use("/api/v1", async (req, res, next) => {
+  try {
+    await connectDB();
+    next();
+  } catch (error) {
+    next(error);
+  }
+});
+
 app.get("/api/v1/health", (req, res) => {
   res.status(200).json({
     success: true,
     message: "Doctor Tracker API is running",
+    database: "connected",
     environment: process.env.NODE_ENV || "development",
     timestamp: new Date().toISOString(),
   });
@@ -135,10 +122,7 @@ app.use((err, req, res, next) => {
     return next(err);
   }
 
-  let statusCode = Number(
-    err.statusCode || err.status || 500
-  );
-
+  let statusCode = Number(err.statusCode || err.status || 500);
   let message = err.message || "Request failed";
 
   if (message === "Origin not allowed by CORS") {
