@@ -23,7 +23,9 @@ const generateToken = (user) => {
 };
 
 export const loginUser = async ({ email, password }) => {
-  const user = await User.findOne({ email }).select("+password");
+  const user = await User.findOne({
+    email: String(email).trim().toLowerCase(),
+  }).select("+password");
 
   if (!user) {
     throw new AppError("Invalid email or password.", 401);
@@ -47,15 +49,13 @@ export const loginUser = async ({ email, password }) => {
 
   const token = generateToken(user);
 
-  const safeUser = {
-    id: user._id.toString(),
-    name: user.name,
-    email: user.email,
-    role: user.role,
-  };
-
   return {
     token,
-    user: safeUser,
+    user: {
+      id: user._id.toString(),
+      name: user.name,
+      email: user.email,
+      role: user.role,
+    },
   };
 };

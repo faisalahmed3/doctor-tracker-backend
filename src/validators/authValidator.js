@@ -6,7 +6,7 @@ export const loginSchema = z.object({
     .string()
     .trim()
     .email("Enter a valid email address.")
-    .transform((value) => value.toLowerCase()),
+    .toLowerCase(),
 
   password: z
     .string()

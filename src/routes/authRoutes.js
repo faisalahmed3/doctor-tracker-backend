@@ -1,5 +1,5 @@
 
-import express from "express";
+import { Router } from "express";
 import rateLimit from "express-rate-limit";
 
 import {
@@ -10,12 +10,10 @@ import {
 
 import { protect } from "../middleware/authMiddleware.js";
 import { validateBody } from "../middleware/validate.js";
-
 import { loginSchema } from "../validators/authValidator.js";
 
-const router = express.Router();
+const router = Router();
 
-// Login rate limiter
 const loginLimiter = rateLimit({
   windowMs: 15 * 60 * 1000,
   limit: 10,
@@ -27,18 +25,8 @@ const loginLimiter = rateLimit({
   },
 });
 
-// POST /api/v1/auth/login
-router.post(
-  "/login",
-  loginLimiter,
-  validateBody(loginSchema),
-  login
-);
-
-// POST /api/v1/auth/logout
+router.post("/login", loginLimiter, validateBody(loginSchema), login);
 router.post("/logout", logout);
-
-// GET /api/v1/auth/me
 router.get("/me", protect, getMe);
 
 export default router;

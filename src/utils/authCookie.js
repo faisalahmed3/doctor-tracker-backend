@@ -1,9 +1,15 @@
 
 export const AUTH_COOKIE_NAME = "doctor_tracker_token";
 
-const sameSite = (
+const configuredSameSite = (
   process.env.COOKIE_SAME_SITE || "lax"
 ).toLowerCase();
+
+const sameSite = ["strict", "lax", "none"].includes(
+  configuredSameSite
+)
+  ? configuredSameSite
+  : "lax";
 
 const secure =
   process.env.NODE_ENV === "production" ||

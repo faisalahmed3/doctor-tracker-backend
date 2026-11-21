@@ -30,6 +30,10 @@ export const protect = async (req, res, next) => {
     );
   }
 
+  if (!decoded?.sub) {
+    throw new AppError("Invalid authentication token.", 401);
+  }
+
   const user = await User.findById(decoded.sub)
     .select("name email role isActive");
 
@@ -50,16 +54,13 @@ export const protect = async (req, res, next) => {
   next();
 };
 
-// Role-based authorization
-export const restrictTo = (...roles) => {
-  return (req, res, next) => {
-    if (!req.user || !roles.includes(req.user.role)) {
-      throw new AppError(
-        "You do not have permission to perform this action.",
-        403
-      );
-    }
+export const restrictTo = (...roles) => (req, res, next) => {
+  if (!req.user || !roles.includes(req.user.role)) {
+    throw new AppError(
+      "You do not have permission to perform this action.",
+      403
+    );
+  }
 
-    next();
-  };
+  next();
 };
