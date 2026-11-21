@@ -81,7 +81,7 @@ Before running the project, make sure you have installed:
 ### 1. Clone the Repository
 
 ```bash
-git clone [https://github.com/faisalahmed3/doctor-tracker-backend](https://github.com/faisalahmed3/doctor-tracker-backend)
+git clone https://github.com/faisalahmed3/doctor-tracker-backend
 ```
 
 ### 2. Navigate to the Backend Directory
