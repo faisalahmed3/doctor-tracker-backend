@@ -14,29 +14,79 @@ import dashboardRoutes from "./src/routes/dashboardRoutes.js";
 const app = express();
 
 app.disable("x-powered-by");
+
+if (process.env.NODE_ENV === "production") {
+  app.set("trust proxy", 1);
+}
+
 app.use(helmet());
 
+const normalizeOrigin = (value = "") => {
+  try {
+    return new URL(value.trim()).origin;
+  } catch {
+    return value.trim().replace(/\/+$/, "");
+  }
+};
+
 const allowedOrigins = new Set(
-  (process.env.FRONTEND_URL || "http://localhost:3000")
+  (
+    process.env.FRONTEND_URL ||
+    "http://localhost:3000"
+  )
     .split(",")
-    .map((origin) => origin.trim())
+    .map(normalizeOrigin)
     .filter(Boolean)
 );
 
-app.use(
-  cors({
-    origin(origin, callback) {
-      callback(null, !origin || allowedOrigins.has(origin));
-    },
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-    optionsSuccessStatus: 204,
-  })
-);
+const corsOptions = {
+  origin(origin, callback) {
+    if (!origin) {
+      return callback(null, true);
+    }
 
-app.use(express.json({ limit: "10kb", strict: true }));
-app.use(express.urlencoded({ extended: true, limit: "10kb" }));
+    const normalizedOrigin = normalizeOrigin(origin);
+
+    if (allowedOrigins.has(normalizedOrigin)) {
+      return callback(null, origin);
+    }
+
+    console.warn(`[CORS] Blocked origin: ${origin}`);
+
+    return callback(new Error("Origin not allowed by CORS"));
+  },
+
+  credentials: true,
+
+  methods: [
+    "GET",
+    "POST",
+    "PUT",
+    "PATCH",
+    "DELETE",
+    "OPTIONS",
+  ],
+
+  allowedHeaders: [
+    "Content-Type",
+    "Authorization",
+  ],
+
+  optionsSuccessStatus: 204,
+};
+
+app.use(cors(corsOptions));
+
+app.use(express.json({
+  limit: "10kb",
+  strict: true,
+}));
+
+app.use(express.urlencoded({
+  extended: true,
+  limit: "10kb",
+}));
+
 app.use(cookieParser());
 
 if (process.env.NODE_ENV !== "production") {
@@ -50,6 +100,7 @@ app.use(
     limit: 200,
     standardHeaders: true,
     legacyHeaders: false,
+    skip: (req) => req.method === "OPTIONS",
     message: {
       success: false,
       message: "Too many requests. Please try again later.",
@@ -80,12 +131,20 @@ app.use((req, res) => {
 });
 
 app.use((err, req, res, next) => {
-  if (res.headersSent) return next(err);
+  if (res.headersSent) {
+    return next(err);
+  }
 
-  let statusCode = Number(err.statusCode || err.status || 500);
+  let statusCode = Number(
+    err.statusCode || err.status || 500
+  );
+
   let message = err.message || "Request failed";
 
-  if (err.type === "entity.parse.failed") {
+  if (message === "Origin not allowed by CORS") {
+    statusCode = 403;
+    message = "Request origin is not allowed.";
+  } else if (err.type === "entity.parse.failed") {
     statusCode = 400;
     message = "Invalid JSON request body.";
   } else if (err.type === "entity.too.large") {
@@ -93,12 +152,15 @@ app.use((err, req, res, next) => {
     message = "Request body is too large.";
   } else if (err.code === 11000) {
     statusCode = 409;
+
     const field = Object.keys(err.keyPattern || {})[0];
+
     message = field
       ? `A record with this ${field} already exists.`
       : "A record with this value already exists.";
   } else if (err.name === "ValidationError") {
     statusCode = 400;
+
     message =
       Object.values(err.errors || {})
         .map((error) => error.message)
@@ -108,7 +170,11 @@ app.use((err, req, res, next) => {
     message = "Invalid resource identifier.";
   }
 
-  if (!Number.isInteger(statusCode) || statusCode < 400 || statusCode > 599) {
+  if (
+    !Number.isInteger(statusCode) ||
+    statusCode < 400 ||
+    statusCode > 599
+  ) {
     statusCode = 500;
   }
 
